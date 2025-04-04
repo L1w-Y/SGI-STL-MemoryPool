@@ -73,5 +73,31 @@ size_t roundUp(size_t bytes) {return (bytes + ALIGN - 1) & ~(ALIGN - 1);}
 size_t freeListIndex(size_t bytes) {return (bytes + ALIGN - 1) / ALIGN - 1;}   
 ```
 ### 5.1 roundUp函数
-    
+将bytes向上对齐到 ALIGN 的倍数
+
+| `bytes` | `roundUp` |
+| --- | --- |
+| 3 | 8 |
+| 8 | 8 |
+| 9 | 16 |
+| 16 | 16 |
+| 17 | 24 |    
 ### 5.2 freeListIndex函数
+计算给定 bytes（内存块的字节大小）对应的自由链表索引，也就是这块内存在freelist数组的什么位置
+
+| `bytes` | `freeListIndex` |
+| --- | --- |
+| 1  | 0  |
+| 8  | 0  |
+| 9  | 1  |
+| 16 | 1  |
+| 17 | 2  |
+| 24 | 2  |
+
+## 六、内存分配
+### 6.1 allocate函数
+#### 流程图
+![allocate process.png](res/allocate%20process.png)
+### 6.2 S_refill函数
+![refill process.png](res/refill%20process.png)
+### 6.3 S_chunk_alloc函数
