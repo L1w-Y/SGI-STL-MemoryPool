@@ -3,15 +3,17 @@
 - [一、内存池粒度定义](#一内存池粒度定义)
 - [二、内存池结构图](#二内存池结构图)
 - [三、自由链表的表头结构](#三自由链表的表头结构)
-  - [3.1 关于 Obj 联合体的设计](#31-关于-obj-联合体的设计)
+  - [3.1 关于 Obj 联合体的设计](#31-关于obj联合体的设计)
 - [四、链表和静态成员](#四链表和静态成员)
 - [五、两个重要辅助函数](#五两个重要辅助函数)
-  - [5.1 roundUp 函数](#51-roundup-函数)
-  - [5.2 freeListIndex 函数](#52-freelistindex-函数)
-- [六、内存分配](#六内存分配)
-  - [6.1 allocate 函数](#61-allocate-函数)
-  - [6.2 S_refill 函数](#62-s_refill-函数)
-  - [6.3 S_chunk_alloc 函数](#63-s_chunk_alloc-函数)
+  - [5.1 roundUp 函数](#51-roundup函数)
+  - [5.2 freeListIndex 函数](#52-freelistindex函数)
+- [六、内存分配](#六内存调度)
+  - [6.1 分配：allocate 函数](#61-分配allocate函数)
+  - [6.2 内存管理：S_refill 函数](#62-内存管理s_refill函数)
+  - [6.3 实际的内存分配：S_chunk_alloc 函数](#63-实际的内存分配s_chunk_alloc函数)
+  - [6.4 归还：deallocate函数](#64-归还deallocate函数)
+  - [6.5 扩容/缩容：reallocate函数](#65-扩容缩容reallocate函数)
 ## 一、内存池粒度定义
 ```cpp
 enum { ALIGN = 8 };                      // 内存对齐
@@ -107,11 +109,13 @@ size_t freeListIndex(size_t bytes) {return (bytes + ALIGN - 1) / ALIGN - 1;}
 | 17 | 2  |
 | 24 | 2  |
 
-## 六、内存分配
-### 6.1 allocate函数
-#### 流程图
+## 六、内存调度
+### 6.1 分配：allocate函数
 ![allocate process.png](res/allocate%20process.png)
-### 6.2 S_refill函数
-![refill process2.png](res/refill%20process2.png){:style="width: 70%"}
-### 6.3 S_chunk_alloc函数
-![chunk_alloc process.png](res/chunk_alloc%20process.png)
+### 6.2 内存管理：S_refill函数
+![refill process2.png](res/refill%20process2.png)
+### 6.3 实际的内存分配：S_chunk_alloc函数
+![chunk_alloc process2.png](res/chunk_alloc%20process2.png)
+### 6.4 归还：deallocate函数
+
+### 6.5 扩容/缩容：reallocate函数
