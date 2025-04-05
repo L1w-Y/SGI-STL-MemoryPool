@@ -30,7 +30,7 @@ union Obj {
 };
 ```
 ### 3.1 关于Obj联合体的设计
-#### 1. 为什么需要 char data[1] ?
+>#### 1. 为什么需要 char data[1] ?
 "柔性数组" `M_client_data[1]` 只是个占位符,当 malloc 分配一块足够大的内存时，Obj 结构体会占据前面的一部分，后续的空间会直接作为 M_client_data 来存放数据。整个 Obj 结构体和数据部分是连续的，避免了额外的指针存储和碎片化。
 
 当 malloc 分配 128 字节时：
@@ -42,12 +42,12 @@ Obj* object = (Obj*)malloc(sizeof(Obj) + 128);
     * Obj 占 8 字节
     * 128 字节的数据区域从 M_client_data[1] 之后开始
 
-#### 2. 为什么是字节数组?
+>#### 2. 为什么用字节数组?
 在 C/C++ 中，`char*`（或 `unsigned char*`）被定义为 **“可以合法访问任何内存”** 的指针类型
 
 因为char的大小是 1 字节，所以可以逐字节访问内存的原始内容
 
-#### 3. 空白内存需要分块构建成链表的形式，但是为什么是用union，而不是struct?
+>#### 3. 空白内存需要分块构建成链表的形式，但是为什么是用union，而不是struct?
 **（1）union 支持类型双关**：`类型双关` 是指 `同一块内存被不同的类型解释` ，所以用union来设计的巧妙在于这块内存的双重身份，可以别名同一内存
 
  ① 空闲时→作为_Obj链表节点
@@ -117,5 +117,6 @@ size_t freeListIndex(size_t bytes) {return (bytes + ALIGN - 1) / ALIGN - 1;}
 ### 6.3 实际的内存分配：S_chunk_alloc函数
 ![chunk_alloc process2.png](res/chunk_alloc%20process2.png)
 ### 6.4 归还：deallocate函数
-
+![deallocate process.png](res/deallocate%20process.png)
 ### 6.5 扩容/缩容：reallocate函数
+![reallocate process.png](res/reallocate%20process.png)
