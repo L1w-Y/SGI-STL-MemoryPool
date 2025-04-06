@@ -4,24 +4,47 @@
 
 #include "MemoryPool.h"
 MemoryPool::MemoryPool() {
-
+    startFree = nullptr;        // ³õÊ¼Îª¿Õ
+    endFree = nullptr;          // ³õÊ¼Îª¿Õ
+    heapSize = 0;
+    // ³õÊ¼ÎŞ·ÖÅäÄÚ´æ
+    for (auto & i : freelist) {
+        i = nullptr;  // ³õÊ¼»¯ËùÓĞ×ÔÓÉÁ´±íÎª¿Õ
+    }
 }
 
+MemoryPool::~MemoryPool() {
+    // ÊÍ·Å¶ÑÄÚ´æ
+    if (startFree) {
+        free(startFree);  // Ö»ÊÍ·Å startFree Ö¸ÏòµÄÄÇÒ»¿é malloc µÃµ½µÄÄÚ´æ
+        startFree = nullptr;
+        endFree = nullptr;
+    }
+    // ÊÍ·Å×ÔÓÉÁ´±íÖĞµÄÄÚ´æ¿é
+    for (auto& current : freelist) {
+        while (current) {
+            Obj* next = current->next;
+            free(current);  // ÊÍ·Å×ÔÓÉÁ´±íÖĞµÄÄÚ´æ¿é
+            current = next;
+        }
+    }
+}
 
 void* MemoryPool::refill(const size_t size) {
     int nobjs = 20;
     Obj *current_obj;
     Obj* next_obj;
-    char* chunk = chunkAlloc(size,nobjs); //åˆ†é…è¿ç»­å†…å­˜ï¼Œå¤§å°ä¸º size*nobjs
+    char* chunk = chunkAlloc(size,nobjs); //·ÖÅäÁ¬ĞøÄÚ´æ£¬´óĞ¡Îª size*nobjs
+
     if (nobjs == 1) return  chunk;
 
     Obj **my_freelist = freelist + freeListIndex(size);
 
-    const auto result = (Obj *) chunk;   //ç±»å‹è½¬æ¢
-    *my_freelist = next_obj = result + size; //ç¬¬ä¸€å—å†…å­˜æ˜¯åˆ†é…å‡ºå»çš„ï¼Œå‰©ä¸‹çš„å†…å­˜æ„å»ºä¸ºé™æ€é“¾è¡¨
+    const auto result = reinterpret_cast<Obj *>(chunk);   //ÀàĞÍ×ª»»
+    *my_freelist = next_obj =  reinterpret_cast<Obj *>(chunk + size); //µÚÒ»¿éÄÚ´æÊÇ·ÖÅä³öÈ¥µÄ£¬Ê£ÏÂµÄÄÚ´æ¹¹½¨Îª¾²Ì¬Á´±í
     for (int i = 0;i<nobjs-1;i++) {
         current_obj =next_obj;
-        next_obj = (Obj*)((char*)next_obj + size);
+        next_obj = reinterpret_cast<Obj *>(reinterpret_cast<char *>(next_obj) + size);
         current_obj->next = next_obj;
     }
     // ReSharper disable once CppLocalVariableMightNotBeInitialized
@@ -29,17 +52,17 @@ void* MemoryPool::refill(const size_t size) {
     return result;
 }
 
-char * MemoryPool::chunkAlloc(size_t size, int &nobjs) {
+char * MemoryPool::chunkAlloc(const size_t size, int &nobjs) {
     char* result;
     size_t total_bytes=size*nobjs;
     size_t bytes_left=endFree-startFree;
-    if (bytes_left>=total_bytes) {
+    if (bytes_left>=total_bytes){
         result= startFree;
         startFree+=total_bytes;
         return(result);
     }
     if (bytes_left>=size) {
-        nobjs = (int)(bytes_left/size);
+        nobjs = static_cast<int>(bytes_left / size);
         total_bytes = size*nobjs;
         result=startFree;
         startFree+=total_bytes;
@@ -48,39 +71,45 @@ char * MemoryPool::chunkAlloc(size_t size, int &nobjs) {
     const size_t bytes_to_get = 2*total_bytes+ roundUp(heapSize>>4);
     if (bytes_left>0) {
         Obj** my_freelist = freelist + freeListIndex((bytes_left));
-        ((Obj*)startFree)->next=*my_freelist;
-        *my_freelist = (Obj*)startFree;
+        reinterpret_cast<Obj *>(startFree)->next=*my_freelist;
+        *my_freelist = reinterpret_cast<Obj *>(startFree);
     }
-    startFree = (char *)malloc(bytes_to_get);
+    startFree = static_cast<char *>(malloc(bytes_to_get));
     if (!startFree) {
-        for (size_t i = size;i<=(size_t)MAX_BYTES;i+= (size_t)ALIGN) {
+        for (size_t i = size;i<=static_cast<size_t>(MAX_BYTES);i+= static_cast<size_t>(ALIGN)) {
             Obj **my_freelist = freelist + freeListIndex(i);
-            if (Obj *p = *my_freelist; !p) {
+            if (Obj *p = *my_freelist; p) {
                 *my_freelist=p->next;
-                startFree=(char*)p;
+                startFree=reinterpret_cast<char *>(p);
                 endFree=startFree+i;
+                return chunkAlloc(size, nobjs);
             }
         }
-        endFree=nullptr;
-        //startFree=allocate(bytes_to_get);
+        // ÊµÔÚÃ»ÓĞ¿ÉÓÃÄÚ´æÁË
+        endFree = nullptr;
+        throw std::bad_alloc();
     }
     heapSize += bytes_to_get;
     endFree=startFree+bytes_to_get;
-    return(chunkAlloc(size,nobjs));
+    return chunkAlloc(size,nobjs);
 
 }
 
 void* MemoryPool::allocate(const size_t size) {
     void* ret;
-    if (size>MAX_BYTES) { // å¦‚æœå¤§äºæœ€å¤§åˆ†é…æ•°ï¼Œä¸ç”±å†…å­˜æ± ç®¡ç†
+    if (size>MAX_BYTES) { // Èç¹û´óÓÚ×î´ó·ÖÅäÊı£¬²»ÓÉÄÚ´æ³Ø¹ÜÀí
         ret = malloc(size);
+        if (ret) {
+            std::cout << "Allocated " << size << " bytes using malloc at: " << ret << std::endl;
+            return ret;
+        }
     }else {
         Obj** my_freelist = freelist + freeListIndex(size);
-        if (Obj* result = *my_freelist) {   //å¦‚æœå¯¹åº”é“¾è¡¨æœ‰ç©ºé—²å†…å­˜ï¼Œç›´æ¥åˆ†é…
+        if (Obj* result = *my_freelist) {   //Èç¹û¶ÔÓ¦Á´±íÓĞ¿ÕÏĞÄÚ´æ£¬Ö±½Ó·ÖÅä
             *my_freelist = result->next;
             ret = result;
-        }else {//æ²¡æœ‰åˆå§‹åˆ†é…
-            ret = refill(roundUp((size)));//ä¼ å…¥å‰è¿›è¡Œå†…å­˜å¯¹é½ï¼ˆæ¯”å¦‚size=7 ->  8ï¼‰
+        }else {//Ã»ÓĞ³õÊ¼·ÖÅä
+            ret = refill(roundUp((size)));//´«ÈëÇ°½øĞĞÄÚ´æ¶ÔÆë£¨±ÈÈçsize=7 ->  8£©
         }
     }
     return  ret;
@@ -98,12 +127,13 @@ void* MemoryPool::reallocate(char *oldChunk, const size_t oldSize, const size_t 
     return  result;
 }
 
-void MemoryPool::deallocate(char *chunk, size_t n) {
+void MemoryPool::deallocate(char *chunk, const size_t n) {
     if (n>MAX_BYTES) {
+        std::cout << "Freeing large block: " << n << " bytes" << std::endl;
         free(chunk);
     }else {
         Obj** my_freelist = freelist + freeListIndex(n);
-        Obj* q = (Obj*)chunk;
+        const auto q = reinterpret_cast<Obj *>(chunk);
         q->next=*my_freelist;
         *my_freelist=q;
     }
