@@ -3,7 +3,7 @@
 #include <cstring>
 
 int main() {
-    system("chcp 65001");
+
     MemoryPool pool;
     std::cout << "ptr1分配 16 字节：" << std::endl;
     void* ptr1 = pool.allocate(16);

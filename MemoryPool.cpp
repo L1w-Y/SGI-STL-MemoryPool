@@ -15,19 +15,13 @@ MemoryPool::MemoryPool() {
 
 MemoryPool::~MemoryPool() {
     // 释放堆内存
-    if (startFree) {
-        free(startFree);  // 只释放 startFree 指向的那一块 malloc 得到的内存
-        startFree = nullptr;
-        endFree = nullptr;
+    // 释放堆内存
+    for (void* chunk : allAllocatedChunks) {
+        free(chunk);  // 所有 malloc 出来的 chunk 都集中释放
     }
-    // 释放自由链表中的内存块
-    for (auto& current : freelist) {
-        while (current) {
-            Obj* next = current->next;
-            free(current);  // 释放自由链表中的内存块
-            current = next;
-        }
-    }
+    allAllocatedChunks.clear();
+    startFree = nullptr;
+    endFree = nullptr;
 }
 
 void* MemoryPool::refill(const size_t size) {
@@ -75,6 +69,7 @@ char * MemoryPool::chunkAlloc(const size_t size, int &nobjs) {
         *my_freelist = reinterpret_cast<Obj *>(startFree);
     }
     startFree = static_cast<char *>(malloc(bytes_to_get));
+    allAllocatedChunks.push_back(startFree);
     if (!startFree) {
         for (size_t i = size;i<=static_cast<size_t>(MAX_BYTES);i+= static_cast<size_t>(ALIGN)) {
             Obj **my_freelist = freelist + freeListIndex(i);
@@ -99,6 +94,7 @@ void* MemoryPool::allocate(const size_t size) {
     void* ret;
     if (size>MAX_BYTES) { // 如果大于最大分配数，不由内存池管理
         ret = malloc(size);
+        allAllocatedChunks.push_back(ret);
         if (ret) {
             std::cout << "Allocated " << size << " bytes using malloc at: " << ret << std::endl;
             return ret;
